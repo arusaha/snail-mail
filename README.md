@@ -20,6 +20,16 @@ Built for the mailbox you forget to check because most of it is advertising.
 - **Get local Android notifications.** Optional background checks over Tailscale flag important mail, approaching deadlines, stronger fullness warnings, or failed checks. No Firebase account or push relay is required.
 - **Keep Windows quiet.** An optional system tray server starts at sign-in, opens from a desktop shortcut, and runs without a console window.
 
+## Screenshots
+
+Actual application screens with **synthetic demo mail**. All names, addresses, and mail images below are fictional. The mobile screenshot shows the responsive web interface shared with the Android app.
+
+| Desktop: thumbnails and full-image reader | Mobile: focused detail view |
+| --- | --- |
+| [![Snail Mail desktop USPS Informed Delivery dashboard with a two-pane reader, deadline flag, and mailbox fullness estimate](docs/assets/desktop-reader.jpg)](docs/assets/desktop-reader.jpg) | [![Snail Mail mobile detail view with the full envelope preview, visible deadline, and classification evidence](docs/assets/mobile-detail.jpg)](docs/assets/mobile-detail.jpg) |
+
+Click either screenshot to view it at full size.
+
 ## Get started
 
 You need **Node.js 24+**, npm, USPS Informed Delivery digest emails, and an AI tool that can read your authorized Gmail messages, inspect images, and run local commands. Gmail/AI access is **not** included in this repository.
