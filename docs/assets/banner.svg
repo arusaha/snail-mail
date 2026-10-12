@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="440" viewBox="0 0 1200 440" role="img" aria-labelledby="title desc">
+<title id="title">Snail Mail — know what's worth the walk</title><desc id="desc">A private visual inbox for physical mail, with AI sorting and one-click pickup tracking. Illustrated with synthetic mail cards.</desc>
+<rect width="1200" height="440" rx="24" fill="#17241e"/>
+<rect x="54" y="48" width="48" height="48" rx="13" fill="#b8dfc7"/><g fill="none" stroke="#234633" stroke-width="2.6" stroke-linejoin="round"><rect x="64" y="62" width="29" height="22" rx="3"/><path d="m65 64 13 11 14-11M71 57h16"/></g>
+<g font-family="Arial,Helvetica,sans-serif"><text x="118" y="81" fill="#e9f4ed" font-size="26" font-weight="700">snail mail</text>
+<text x="54" y="164" fill="#f0f5ef" font-size="43" font-weight="700">Know what's</text><text x="54" y="216" fill="#b8dfc7" font-size="43" font-weight="700">worth the walk.</text>
+<text x="54" y="266" fill="#b7c6bc" font-size="20">Your physical mailbox. Finally organized.</text>
+<text x="54" y="319" fill="#d6e7dc" font-size="17">VISUAL INBOX · AI SORTING · PICKUP TRACKING</text>
+<rect x="54" y="351" width="210" height="38" rx="19" fill="#30483a"/><text x="76" y="376" fill="#c8e6d1" font-size="16">Self-hosted. Your AI.</text>
+<rect x="630" y="47" width="510" height="346" rx="18" fill="#23372c" stroke="#3c5747"/>
+<text x="655" y="84" fill="#f0f5ef" font-size="20" font-weight="700">Your mailbox, at a glance</text>
+<rect x="655" y="103" width="98" height="28" rx="14" fill="#c8e6d1"/><text x="680" y="122" fill="#234633" font-size="13">Inbox 2</text><text x="777" y="122" fill="#b7c6bc" font-size="13">Spam 1</text><text x="867" y="122" fill="#b7c6bc" font-size="13">Archive</text>
+<g transform="translate(655 153)"><rect width="218" height="153" rx="10" fill="#17271e"/><rect x="20" y="16" width="178" height="81" rx="5" fill="#eeeade"/><path d="m23 20 86 52 86-52" fill="none" stroke="#b9b4a4" stroke-width="2"/><text x="14" y="123" fill="#f0f5ef" font-size="15">Utility envelope</text><text x="14" y="143" fill="#e8c975" font-size="12">Important · sample</text></g>
+<g transform="translate(889 153)"><rect width="225" height="153" rx="10" fill="#17271e"/><rect x="20" y="16" width="185" height="81" rx="5" fill="#c7dccb"/><path d="m23 20 89 52 90-52" fill="none" stroke="#82a68c" stroke-width="2"/><text x="14" y="123" fill="#f0f5ef" font-size="15">Neighborhood letter</text><text x="14" y="143" fill="#b7c6bc" font-size="12">Take a look · sample</text></g>
+<rect x="655" y="331" width="459" height="37" rx="9" fill="#b8dfc7"/><text x="801" y="355" fill="#234633" font-size="15" font-weight="700">I picked up the mail</text>
+</g></svg>

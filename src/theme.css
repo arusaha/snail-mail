@@ -1,0 +1,16 @@
+:root {
+  color-scheme: light dark;
+  --bg: light-dark(#f5f4f0, #171c1b);
+  --paper: light-dark(#fffefa, #232b28);
+  --ink: light-dark(#243c34, #eef3ef);
+  --muted: light-dark(#66746c, #acbab2);
+  --line: light-dark(#dfe3db, #3c4a42);
+  --green: light-dark(#285b47, #b2ddc5);
+  --on: light-dark(#fff, #173b2c);
+  --soft: light-dark(#e7eee7, #293c30);
+  --warn: light-dark(#83551e, #f6cb85);
+  --warn-bg: light-dark(#f6ead6, #3b3020);
+  --red: light-dark(#a13b30, #ffa59b);
+  --red-bg: light-dark(#fae9e4, #442a27);
+  --image-bg: light-dark(#eae9e3, #323933);
+}
