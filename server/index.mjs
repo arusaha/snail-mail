@@ -124,6 +124,9 @@ app.post("/api/ingest/run", (req, res) => {
   if (typeof req.body.ok !== "boolean") throw new Error("ok must be a boolean");
   res.json(store.recordRun(req.body.ok, req.body.detail));
 });
+app.post("/api/ingest/tracking", (req, res) => {
+  res.json(store.updateTracking(req.body));
+});
 app.get("/media/:kind/:name", (req, res) => {
   if (
     !["images", "thumbs"].includes(req.params.kind) ||

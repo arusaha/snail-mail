@@ -26,6 +26,25 @@ const digest = (sourceId, date, items = [item()], packages = []) => ({
   items,
   packages,
 });
+const trackingPackage = {
+  tracking: "0000000000000000000001",
+  sender: "Test package",
+  status: "expected",
+  expectedDate: null,
+  deliveredDate: null,
+  details: "USPS is awaiting the item",
+};
+const trackingUpdate = (extra = {}) => ({
+  tracking: trackingPackage.tracking,
+  status: "in_transit",
+  checkedAt: "2026-10-11T22:00:00.000Z",
+  sourceUrl: `https://tools.usps.com/tracking/${trackingPackage.tracking}`,
+  expectedDate: "2026-10-12",
+  deliveredDate: null,
+  details: "Arrived at USPS Facility",
+  evidence: "The item is currently in transit to the destination.",
+  ...extra,
+});
 function fixture(t) {
   const dir = mkdtempSync(join(tmpdir(), "snail-test-"));
   let now = new Date("2026-10-11T23:00:00Z");
@@ -39,6 +58,81 @@ function fixture(t) {
   });
   return { s, time: (v) => (now = new Date(v)) };
 }
+
+test("direct tracking survives digest updates and respects pickup and undo", (t) => {
+  const { s, time } = fixture(t);
+  s.importDigest(digest("aaaaaaaaaaaa", "2026-10-05", [], [trackingPackage]));
+  s.updateTracking(trackingUpdate());
+  assert.equal(s.state().packages[0].trackingUpdate.status, "in_transit");
+  const revision = s.state().revision;
+  assert.equal(s.updateTracking(trackingUpdate()).duplicate, true);
+  assert.equal(s.state().revision, revision);
+  const delivered = trackingUpdate({
+    status: "delivered",
+    deliveredDate: "2026-10-11",
+    expectedDate: null,
+    checkedAt: "2026-10-11T23:00:00.000Z",
+    details: "Delivered, In/At Mailbox",
+    evidence: "Delivered on October 11, 2026.",
+  });
+  s.updateTracking(delivered);
+  const id = randomUUID();
+  s.pickup(id, s.state().revision);
+  assert.equal(s.state().packages[0].archived, true);
+  time("2026-10-12T16:00:00Z");
+  s.importDigest(digest("bbbbbbbbbbbb", "2026-10-12", [], [trackingPackage]));
+  assert.equal(s.state().packages[0].status, "delivered");
+  assert.deepEqual(s.state().packages[0].trackingUpdate, delivered);
+  assert.equal(s.state().packages[0].archived, true);
+  s.undo(id);
+  assert.equal(s.state().packages[0].archived, false);
+});
+
+test("tracking rejects unrelated, unsupported and stale evidence without changing state", (t) => {
+  const { s } = fixture(t);
+  assert.throws(
+    () => s.updateTracking(trackingUpdate()),
+    /not in this mailbox/,
+  );
+  s.importDigest(digest("aaaaaaaaaaaa", "2026-10-05", [], [trackingPackage]));
+  assert.throws(() =>
+    s.updateTracking(trackingUpdate({ sourceUrl: "https://example.com" })),
+  );
+  assert.throws(
+    () =>
+      s.updateTracking(
+        trackingUpdate({ checkedAt: "2026-10-12T22:00:00.000Z" }),
+      ),
+    /future/,
+  );
+  assert.throws(() =>
+    s.updateTracking(trackingUpdate({ status: "delivered" })),
+  );
+  s.updateTracking(trackingUpdate());
+  assert.throws(
+    () =>
+      s.updateTracking(
+        trackingUpdate({ checkedAt: "2026-10-10T22:00:00.000Z" }),
+      ),
+    /newer/,
+  );
+  s.updateTracking(
+    trackingUpdate({
+      status: "delivered",
+      deliveredDate: "2026-10-11",
+      checkedAt: "2026-10-11T23:00:00.000Z",
+    }),
+  );
+  const before = s.state();
+  assert.throws(
+    () =>
+      s.updateTracking(
+        trackingUpdate({ checkedAt: "2026-10-11T23:00:00.000Z" }),
+      ),
+    /undo confirmed/,
+  );
+  assert.deepEqual(s.state(), before);
+});
 test("repeated imports are idempotent, corrections persist, shared artwork remains separate physical occurrences", (t) => {
   const { s } = fixture(t);
   const d = digest("aaaaaaaaaaaa", "2026-10-05");
@@ -113,7 +207,7 @@ test("bad count, pre-start date, unsupported confidence and duplicate occurrence
     assert.throws(() => s.importDigest(d));
   assert.equal(s.state().digests.length, 0);
 });
-test("fullness includes bulky spam; package repeats deduplicate and do not occupy the mailbox", (t) => {
+test("fullness includes bulky spam; expected package repeats deduplicate and do not occupy the mailbox", (t) => {
   const { s } = fixture(t);
   const p = {
     tracking: "0000000000000000000001",

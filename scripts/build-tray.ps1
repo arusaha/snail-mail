@@ -17,6 +17,6 @@ header.writeUInt32LE(png.length,14); header.writeUInt32LE(22,18);
 writeFileSync('releases/SnailMailTray.ico',Buffer.concat([header,png]));
 '@ | node --input-type=module
 if ($LASTEXITCODE -ne 0) { throw 'Tray icon build failed' }
-& $snailCompiler /nologo /target:winexe /optimize+ /out:releases\SnailMailTray.exe /win32icon:releases\SnailMailTray.ico /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Web.Extensions.dll windows\SnailMailTray.cs
+& $snailCompiler /nologo /target:winexe /optimize+ /out:releases\SnailMailTray.exe /win32icon:releases\SnailMailTray.ico /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Web.Extensions.dll /reference:System.Xml.Linq.dll /reference:Microsoft.CSharp.dll windows\SnailMailTray.cs windows\StartupRegistration.cs
 if ($LASTEXITCODE -ne 0) { throw 'Tray build failed; quit the existing tray before rebuilding.' }
 Get-Item -LiteralPath 'releases\SnailMailTray.exe' | Select-Object FullName,Length

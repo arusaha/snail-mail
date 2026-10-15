@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { z } from "zod";
 import { resolveMailings, campaignCorrectionKey } from "./mailings.mjs";
 import { readConfig, configSchema } from "./config.mjs";
+import { mailboxPackageUnits } from "./package-capacity.mjs";
 
 export const START_DATE = "1970-01-01";
 export const TIMEZONE = "UTC";
@@ -23,6 +24,40 @@ const day = z
       new Date(s).toISOString().slice(0, 10) === s,
   );
 const imageName = z.string().regex(/^[a-f0-9]{64}\.jpg$/);
+export const trackingUpdateSchema = z
+  .object({
+    tracking: z.string().regex(/^[A-Z0-9]{10,40}$/),
+    status: z.enum([
+      "awaiting_usps",
+      "in_transit",
+      "out_for_delivery",
+      "available_for_pickup",
+      "delivered",
+      "exception",
+      "unknown",
+    ]),
+    checkedAt: z.string().datetime(),
+    sourceUrl: z.string().url(),
+    expectedDate: day.nullable(),
+    deliveredDate: day.nullable(),
+    details: z.string().min(1).max(600),
+    evidence: z.string().min(1).max(1500),
+  })
+  .strict()
+  .superRefine((update, ctx) => {
+    if (
+      update.sourceUrl !== `https://tools.usps.com/tracking/${update.tracking}`
+    )
+      ctx.addIssue({
+        code: "custom",
+        message: "Tracking evidence must identify the same package on USPS",
+      });
+    if ((update.status === "delivered") !== !!update.deliveredDate)
+      ctx.addIssue({
+        code: "custom",
+        message: "Only confirmed delivery requires a delivery date",
+      });
+  });
 export const itemSchema = z
   .object({
     key: z.string().min(1).max(180),
@@ -242,8 +277,43 @@ export function createStore(dir, clock = () => new Date(), overrides = {}) {
       meta(campaignCorrectionKey(id)),
     );
     const pending = mailings.filter((x) => !x.archived);
-    const units = pending.reduce((s, x) => s + x.units, 0);
-    const oldest = pending.map((x) => x.mailingDate).sort()[0];
+    const mailUnits = pending.reduce((s, x) => s + x.units, 0);
+    const packages = db
+      .prepare("SELECT * FROM packages ORDER BY source_date DESC")
+      .all()
+      .map((r) => ({ ...JSON.parse(r.data), sourceDate: r.source_date }))
+      .map((p) => {
+        const trackingUpdate = meta(`tracking:${p.tracking}`);
+        if (!trackingUpdate) return p;
+        return {
+          ...p,
+          status:
+            trackingUpdate.status === "delivered" ? "delivered" : p.status,
+          expectedDate: trackingUpdate.expectedDate,
+          deliveredDate: trackingUpdate.deliveredDate || p.deliveredDate,
+          details: trackingUpdate.details,
+          trackingUpdate,
+        };
+      })
+      .map((p) => ({
+        ...p,
+        archived:
+          !!cutoff &&
+          p.status === "delivered" &&
+          p.deliveredDate &&
+          p.deliveredDate <= cutoff,
+      }))
+      .map((p) => ({ ...p, mailboxUnits: mailboxPackageUnits(p) }));
+    const mailboxPackages = packages.filter((p) => p.mailboxUnits > 0);
+    const packageUnits = mailboxPackages.reduce(
+      (sum, p) => sum + p.mailboxUnits,
+      0,
+    );
+    const units = mailUnits + packageUnits;
+    const oldest = [
+      ...pending.map((x) => x.mailingDate),
+      ...mailboxPackages.map((p) => p.deliveredDate),
+    ].sort()[0];
     const ageDays = oldest
       ? Math.floor((Date.parse(today) - Date.parse(oldest)) / 86400000) + 1
       : 0;
@@ -254,18 +324,6 @@ export function createStore(dir, clock = () => new Date(), overrides = {}) {
         : units >= s.warningUnits || ageDays >= s.warningDays
           ? "medium"
           : "low";
-    const packages = db
-      .prepare("SELECT * FROM packages ORDER BY source_date DESC")
-      .all()
-      .map((r) => ({ ...JSON.parse(r.data), sourceDate: r.source_date }))
-      .map((p) => ({
-        ...p,
-        archived:
-          !!cutoff &&
-          p.status === "delivered" &&
-          p.deliveredDate &&
-          p.deliveredDate <= cutoff,
-      }));
     return {
       items,
       mailings,
@@ -277,6 +335,9 @@ export function createStore(dir, clock = () => new Date(), overrides = {}) {
       },
       capacity: {
         units,
+        mailUnits,
+        packageUnits,
+        mailboxPackages: mailboxPackages.length,
         ageDays,
         level: fullness,
         expectedCampaigns: pending.filter((x) => x.campaignId).length,
@@ -397,6 +458,36 @@ export function createStore(dir, clock = () => new Date(), overrides = {}) {
     );
     return { saved: true };
   }
+  function updateTracking(input) {
+    const update = trackingUpdateSchema.parse(input);
+    if (Date.parse(update.checkedAt) > clock().getTime() + 60000)
+      throw new Error("Tracking check is in the future");
+    if (update.deliveredDate && update.deliveredDate > todayAt())
+      throw new Error("Delivery date is in the future");
+    return transaction(() => {
+      const row = db
+        .prepare("SELECT data FROM packages WHERE tracking=?")
+        .get(update.tracking);
+      if (!row) throw new Error("Tracking number is not in this mailbox");
+      const previous = meta(`tracking:${update.tracking}`);
+      if (
+        previous &&
+        Date.parse(update.checkedAt) < Date.parse(previous.checkedAt)
+      )
+        throw new Error("A newer tracking check is already saved");
+      if (
+        (previous?.status === "delivered" ||
+          JSON.parse(row.data).status === "delivered") &&
+        update.status !== "delivered"
+      )
+        throw new Error("A tracking update cannot undo confirmed delivery");
+      if (JSON.stringify(previous) === JSON.stringify(update))
+        return { saved: true, duplicate: true };
+      setMeta(`tracking:${update.tracking}`, update);
+      bump();
+      return { saved: true };
+    });
+  }
   return {
     db,
     state,
@@ -406,6 +497,7 @@ export function createStore(dir, clock = () => new Date(), overrides = {}) {
     correct,
     configure,
     recordRun,
+    updateTracking,
     close: () => db.close(),
   };
 }

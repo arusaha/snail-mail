@@ -15,7 +15,7 @@ import { tmpdir } from "node:os";
 import { join, resolve, dirname, basename } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
-const binary = resolve("releases/SnailMailTray.exe");
+const binary = resolve(process.env.SNAIL_TRAY_BINARY || "releases/SnailMailTray.exe");
 test(
   "tray runs without a console, prevents duplicates, restarts and stops only its child",
   {

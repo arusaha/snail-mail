@@ -161,15 +161,29 @@ Import oldest to newest. The helper builds and validates `manifest.json`, reads 
 
 The API rejects missing pieces, invalid categories, unsupported image references, and conflicting source identities. Replaying a completed digest is safe and does not overwrite manual corrections. Never write SQLite directly, replace the database, clear existing data, or change pickup cutoffs as an ingestion shortcut.
 
+## Direct USPS tracking
+
+When enabled by the user, on every scheduled check, after digest imports, read the latest `/api/state` and check each unarchived package not already confirmed delivered. Open its official `https://tools.usps.com/go/TrackConfirmAction?tLabels=TRACKING_NUMBER` link in the browser. Check even without a new digest. Do not change delivery instructions, subscribe to alerts, or change the USPS account.
+
+Read the latest actual event. USPS's progress timeline can contain “Delivered” before that step has happened. Record only the observed status, event time/location and visible estimate. An expected date never confirms delivery. Use `awaiting_usps`, `in_transit`, `out_for_delivery`, `available_for_pickup`, `delivered`, `exception`, or `unknown`. Unknown requires a successfully read result explicitly saying status is unavailable; a page failure is a failed check.
+
+Save an array in ignored `data/tracking/CHECK.json`. Each entry contains `tracking`, `status`, `checkedAt` (actual UTC observation timestamp), `sourceUrl` (canonical `https://tools.usps.com/tracking/TRACKING_NUMBER`), `expectedDate` (ISO date or null), `deliveredDate` (ISO date only for confirmed delivery, otherwise null), `details` (concise visible event/estimate), and `evidence` (relevant original USPS wording). Run `node scripts/update-tracking.mjs data/tracking/CHECK.json` and require `verified: true` for each package. The authenticated API stores tracking separately from digest previews, rejects stale updates and delivery regression, and preserves pickup/Undo. Never edit SQLite or an old digest to force a status update.
+
+If USPS is blocked, unavailable, or requires user interaction, preserve the last verified status/timestamp, continue independent packages, and record the overall run as failed with the tracking suffix. Never infer delivery or substitute “awaiting USPS”. Do not repeatedly notify an unchanged failure.
+
+Preserve the exact USPS delivery-location wording in `evidence`, including “Your item was delivered in or at the mailbox…” or the event heading “Delivered, In/At Mailbox” when shown. The server deterministically adds 5 estimated letter equivalents for each unarchived, confirmed mailbox package and uses its delivery date for accumulation age. Do not estimate dimensions or count transit, porch, parcel-locker, or unknown-location deliveries. Use the returned `capacity` and package `mailboxUnits`; do not add the package again in the agent. Pickup/Undo owns whether it still contributes. Existing saved tracking evidence is evaluated automatically.
+
+Notify new confirmed deliveries, ready-for-pickup events, or meaningful delivery issues requiring attention, alongside existing mail/fullness/failure alerts. Store stable `tracking:status:deliveredDate` fingerprints in `data/monitor-state.json` under `notifiedPackageEvents`; include issue text for exceptions. Routine transit/estimate changes stay quiet. Retain other fingerprints and record notified events only after persisted verification and notification.
+
 ### 6. Record the run and notify selectively
 
-After every in-scope digest succeeds, including a genuine no-new-mail run:
+After every in-scope digest and required tracking check succeeds, including a genuine no-new-mail run:
 
 ```sh
 node scripts/ingest.mjs run ok "All in-scope digests reconciled; persisted readback verified."
 ```
 
-If any source, image, classification, import, or readback is unresolved:
+If any source, image, classification, import, tracking check, or readback is unresolved:
 
 ```sh
 node scripts/ingest.mjs run failed "Brief specific failure, without tokens or private email contents."

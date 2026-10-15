@@ -52,11 +52,14 @@ The startup installer registers **Snail Mail local server** for your interactive
 
 - Double-click the tray icon to open the mailbox.
 - Right-click to restart the server, read logs, or quit.
+- Toggle **Automatically start with Windows** in the tray menu. A checkmark means the tray and server will start when you sign in to your Windows account. This does not run before sign-in or require an administrator account. The option reads the actual Windows scheduled task, including startup enabled by an earlier installation.
 - After quitting, double-click the desktop shortcut to start it again. Existing instances are reused.
 - Quit the tray before rebuilding its executable.
-- Disable the scheduled Windows task to stop automatic sign-in startup. Disable your AI schedules separately if you also want ingestion to stop.
+- Uncheck the startup option to stop future automatic starts; the current server keeps running until you quit it. Quitting does not change the startup setting. Disable your AI schedules separately if you also want ingestion to stop.
 
 The tray manages only the server it starts. If you already started one using `npm start`, stop that process before switching to the tray. The tray exposes `--restart` and `--quit` commands for maintenance. Its private stdin pipe supports graceful server shutdown and prevents an orphaned server when the tray exits.
+
+For manual startup only, run `scripts/install-shortcut.ps1` instead of `scripts/install-startup.ps1`. You can also inspect or change automatic startup from PowerShell with `scripts/set-startup.ps1 -Action status`, `-Action enable`, or `-Action disable`. Both the installer and tray use the same native Windows Task Scheduler integration; it refuses to change a task belonging to another installation or Windows user. The tray option does not launch PowerShell or change script execution policy.
 
 ## Android
 

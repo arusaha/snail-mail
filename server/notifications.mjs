@@ -36,7 +36,7 @@ export function notificationFeed(state, now = new Date()) {
   }
   const { level } = state.capacity;
   if (
-    state.counts.inbox + state.counts.spam > 0 &&
+    (state.capacity.units > 0 || state.counts.inbox + state.counts.spam > 0) &&
     ["medium", "high"].includes(level)
   ) {
     const prefix = `capacity:${state.pickup?.id || state.startDate}`;

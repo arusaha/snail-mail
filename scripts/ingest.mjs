@@ -256,7 +256,7 @@ export function prepare(parsed, assets, classifications) {
     }),
   });
 }
-async function call(path, body) {
+export async function call(path, body) {
   const config = existsSync(join(data, "config.json"))
     ? JSON.parse(readFileSync(join(data, "config.json"), "utf8"))
     : {};

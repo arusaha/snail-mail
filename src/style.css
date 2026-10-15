@@ -11,6 +11,7 @@ body {
 }
 button,
 input,
+select,
 textarea {
   font: inherit;
 }
@@ -39,6 +40,7 @@ button:disabled {
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
+select:focus-visible,
 textarea:focus-visible {
   outline: 3px solid var(--green);
   outline-offset: 3px;
@@ -221,12 +223,34 @@ p {
 }
 .listbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   margin: 18px 0 15px;
   color: var(--muted);
   font-size: 12px;
+}
+.list-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+}
+.sort-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sort-control select {
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 9px 10px;
+  color: var(--ink);
+  background: var(--paper);
+  font-size: 12px;
+  cursor: pointer;
 }
 .search {
   display: flex;
@@ -634,7 +658,7 @@ textarea {
   padding: 17px 20px;
   margin-top: 25px;
 }
-.packages > div:first-child {
+.packages-heading {
   display: flex;
   align-items: center;
   gap: 9px;
@@ -642,34 +666,87 @@ textarea {
 .packages h3 {
   margin: 0;
 }
-.package-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 15px;
-  margin: 12px 0;
-  padding: 12px 0;
-  border-top: 1px solid var(--line);
+.package-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr));
+  gap: 14px;
+  margin: 16px 0;
+}
+.package-card {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
   font-size: 12px;
 }
-.package-row strong {
+.package-thumbnail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 13px;
+  padding: 20px 10px;
+  min-height: 144px;
+  text-align: center;
+  color: var(--package-ink);
+  background: var(--package-bg);
+}
+.package-thumbnail span {
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+.package-awaiting {
+  --package-ink: light-dark(#475569, #d0d9e5);
+  --package-bg: light-dark(#e8edf2, #303a47);
+}
+.package-expected {
+  --package-ink: light-dark(#185589, #b3d9ff);
+  --package-bg: light-dark(#dfedfc, #1d3854);
+}
+.package-today {
+  --package-ink: light-dark(#805010, #ffda8b);
+  --package-bg: light-dark(#fff0ce, #49361a);
+}
+.package-delivered {
+  --package-ink: light-dark(#236341, #ade4c3);
+  --package-bg: light-dark(#dbf0e2, #243e30);
+}
+.package-exception {
+  --package-ink: var(--red);
+  --package-bg: var(--red-bg);
+}
+.package-info {
+  min-width: 0;
+  padding: 15px;
+}
+.package-info strong {
   font-size: 13px;
+  font-weight: 600;
+}
+.package-info p {
+  color: var(--muted);
+  margin: 5px 0;
+}
+.package-info .package-date {
+  color: var(--ink);
   font-weight: 550;
 }
-.package-row p {
-  color: var(--muted);
-  margin-top: 4px;
-}
-.package-row span {
+.package-tracking {
+  display: block;
+  overflow-wrap: anywhere;
   font:
     11px ui-monospace,
     monospace;
   color: var(--muted);
 }
-.package-row a {
-  display: flex;
+.package-info a {
+  display: inline-flex;
   align-items: center;
   gap: 5px;
+  min-height: 44px;
+  margin-bottom: -7px;
   white-space: nowrap;
 }
 .sync {
@@ -921,11 +998,22 @@ footer p {
     margin-top: 10px;
   }
   .listbar {
+    align-items: stretch;
+    flex-direction: column;
     font-size: 11px;
     margin: 15px 0;
   }
+  .list-controls {
+    gap: 10px 12px;
+  }
+  .list-controls .search {
+    flex: 1;
+    min-width: 90px;
+  }
   .search input {
-    width: 92px;
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
     font-size: 11px;
   }
   .reading .top,

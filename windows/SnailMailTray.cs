@@ -20,12 +20,24 @@ internal static class Program
         string root = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".."));
         string node = "node.exe";
         string command = "";
+        string startupAction = null;
         for (int i = 0; i < args.Length; i++)
         {
             if (args[i] == "--root" && i + 1 < args.Length) root = Path.GetFullPath(args[++i]);
             else if (args[i] == "--node" && i + 1 < args.Length) node = args[++i];
             else if (args[i] == "--quit" || args[i] == "--restart") command = args[i];
+            else if (args[i] == "--startup" && i + 1 < args.Length) startupAction = args[++i];
             else return 2;
+        }
+        if (startupAction != null)
+        {
+            try
+            {
+                bool enabled = new StartupRegistration(root, node, Application.ExecutablePath).Apply(startupAction);
+                Console.WriteLine(new JavaScriptSerializer().Serialize(new { enabled = enabled }));
+                return 0;
+            }
+            catch (Exception ex) { Console.Error.WriteLine(ex.Message); return 1; }
         }
         string identity;
         using (var sha = SHA256.Create())
@@ -67,22 +79,27 @@ internal sealed class TrayContext : ApplicationContext
     private readonly NotifyIcon tray;
     private readonly Icon icon;
     private readonly ContextMenuStrip menu;
-    private readonly ToolStripMenuItem status, restart;
+    private readonly ToolStripMenuItem status, restart, startup;
     private readonly System.Windows.Forms.Timer timer;
     private readonly EventWaitHandle quitSignal, restartSignal;
     private readonly JavaScriptSerializer json = new JavaScriptSerializer();
     private readonly object logLock = new object();
     private Process server;
     private bool quitting, checking, external;
+    private bool startupChecking;
+    private bool? startupEnabled;
+    private string startupError;
+    private readonly StartupRegistration startupRegistration;
     private int failures;
     private DateTime retryAt = DateTime.MinValue;
     private DateTime nextCheck = DateTime.MinValue;
     [DllImport("kernel32.dll")] private static extern IntPtr GetConsoleWindow();
 
-    public TrayContext(string root, string node, string name)
+    public TrayContext(string root, string node, string name, StartupRegistration startupRegistration = null)
     {
         this.root = root;
         this.node = node;
+        this.startupRegistration = startupRegistration ?? new StartupRegistration(root, node, Application.ExecutablePath);
         data = Path.Combine(root, "data");
         Directory.CreateDirectory(data);
         var config = json.Deserialize<System.Collections.Generic.Dictionary<string, object>>(
@@ -103,6 +120,14 @@ internal sealed class TrayContext : ApplicationContext
         menu.Items.Add(restart);
         menu.Items.Add("View server log", null, delegate { OpenLog("service.log"); });
         menu.Items.Add("View tray log", null, delegate { OpenLog("tray.log"); });
+        menu.Items.Add(new ToolStripSeparator());
+        startup = new ToolStripMenuItem("Automatically start with Windows", null,
+            delegate { UpdateStartup(startup.Checked ? "disable" : "enable"); }) {
+            Enabled = false,
+            ToolTipText = "Start the tray and server when you sign in to Windows."
+        };
+        menu.Items.Add(startup);
+        menu.Opening += delegate { UpdateStartup("status"); };
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Quit and stop server", null, delegate { ExitThread(); });
         tray = new NotifyIcon { Icon = icon, Text = "Snail Mail — starting", ContextMenuStrip = menu, Visible = true };
@@ -145,6 +170,7 @@ internal sealed class TrayContext : ApplicationContext
             trayPid = Process.GetCurrentProcess().Id,
             serverPid = server != null && !server.HasExited ? (int?)server.Id : null,
             state = text, consoleAttached = GetConsoleWindow() != IntPtr.Zero,
+            startWithWindows = startupEnabled, startupError = startupError,
             checkedAt = DateTime.UtcNow.ToString("o")
         };
         try
@@ -155,6 +181,43 @@ internal sealed class TrayContext : ApplicationContext
             else File.Move(path + ".tmp", path);
         }
         catch (IOException ex) { Log("Could not record tray status: " + ex.Message); }
+    }
+    private async void UpdateStartup(string action)
+    {
+        if (quitting || startupChecking) return;
+        startupChecking = true;
+        startup.Enabled = false;
+        try
+        {
+            bool enabled = await Task.Run(() => startupRegistration.Apply(action));
+            if (quitting) return;
+            startupEnabled = enabled;
+            startupError = null;
+            startup.Checked = enabled;
+            startup.ToolTipText = "Start the tray and server when you sign in to Windows. Turning this off leaves the current server running.";
+            if (action != "status") Log("Start with Windows " + (enabled ? "enabled" : "disabled"));
+        }
+        catch (Exception ex)
+        {
+            if (quitting) return;
+            startupEnabled = null;
+            startupError = ex.Message;
+            startup.Checked = false;
+            startup.ToolTipText = "Could not check startup. Reopen this menu to retry; see the tray log for details.";
+            Log("Startup setting failed: " + ex.Message);
+            if (action != "status") MessageBox.Show(
+                "Could not update automatic startup. Reopen the tray menu to check its current state.\n\n" + ex.Message,
+                "Snail Mail", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+        finally
+        {
+            startupChecking = false;
+            if (!quitting)
+            {
+                startup.Enabled = startupEnabled.HasValue;
+                SetStatus(status.Text);
+            }
+        }
     }
     private bool Healthy()
     {
@@ -176,6 +239,7 @@ internal sealed class TrayContext : ApplicationContext
     private async void Tick(object sender, EventArgs args)
     {
         if (quitting) return;
+        if (!startupEnabled.HasValue && startupError == null) UpdateStartup("status");
         if (quitSignal.WaitOne(0)) { ExitThread(); return; }
         if (restartSignal.WaitOne(0)) { Restart(); return; }
         if (checking || DateTime.UtcNow < nextCheck) return;

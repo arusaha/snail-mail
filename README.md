@@ -18,7 +18,9 @@ Built for the mailbox you forget to check because most of it is advertising.
 - **Clear everything with one pickup.** Click **I picked up the mail** to archive the accumulated inbox. New mail starts with the next day's digest. Undo is available.
 - **Don't count a digital preview four times.** Recognized USPS saturation campaign repeats become one expected mailing, with every source appearance preserved and delivery explicitly unconfirmed.
 - **Get local Android notifications.** Optional background checks over Tailscale flag important mail, approaching deadlines, stronger fullness warnings, or failed checks. No Firebase account or push relay is required.
-- **Keep Windows quiet.** An optional system tray server starts at sign-in, opens from a desktop shortcut, and runs without a console window.
+- **Keep Windows quiet.** An optional system tray server starts at sign-in, opens from a desktop shortcut, and runs without a console window. Toggle automatic startup directly from the tray menu.
+- **Choose what comes first.** Sort Inbox, Spam, and Archive by recency or importance. The website and Android app remember your choice.
+- **See package status at a glance.** Colored thumbnails distinguish awaiting USPS, transit, delivery day, confirmed delivery, and delivery issues. Your agent can check USPS tracking during scheduled ingestion; each card shows when its status was checked.
 
 ## Screenshots
 
@@ -88,7 +90,7 @@ React + TypeScript power the interface. Express and Node's built-in SQLite suppo
 
 AI supplies a category, priority, visible evidence, and an estimated size of 1–5 letter equivalents per item. **The fullness calculation itself is deterministic.** Defaults suggest pickup at 12 letter equivalents or 7 days, escalating at 20 equivalents or 14 days. Adjust them for your mailbox in Settings.
 
-USPS previews may precede delivery or omit pieces. A campaign preview is not delivery confirmation. Expected packages appear separately and do not count as mailbox occupancy. Important flags are an aid to review, not a guarantee that a deadline or important letter will be detected.
+USPS previews may precede delivery or omit pieces. A campaign preview is not delivery confirmation. Each unfetched package explicitly confirmed by USPS as delivered in/at the mailbox adds a conservative **5 letter equivalents**; its age starts on the delivery date. Tracking does not provide dimensions. Expected packages, porch deliveries, parcel lockers, and unknown delivery locations do not count as mailbox occupancy. Pickup clears the package contribution, and Undo restores it. Important flags are an aid to review, not a guarantee that a deadline or important letter will be detected.
 
 Pickup uses your configured calendar timezone. Late imports for a collected date stay archived. A repeated saturation campaign follows its first appearance date, so its later previews stay archived after pickup. A new campaign ID starts a new expected mailing. Ordinary matching artwork alone does not prove that physical mail is duplicated.
 

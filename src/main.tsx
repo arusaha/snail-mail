@@ -26,6 +26,7 @@ import "./style.css";
 import { groupMail } from "./mail-groups";
 import { MailNotifications, type NotificationOpen } from "./notifications";
 import { NotificationSettings } from "./NotificationSettings";
+import { PackageCard, type PackageUpdate } from "./PackageCard";
 
 type MailItem = {
   id: string;
@@ -56,19 +57,13 @@ type Config = {
 type State = {
   items: MailItem[];
   mailings: MailItem[];
-  packages: {
-    tracking: string;
-    sender: string;
-    status: string;
-    expectedDate: string | null;
-    deliveredDate: string | null;
-    details: string;
-    archived: boolean;
-    sourceDate: string;
-  }[];
+  packages: PackageUpdate[];
   counts: Record<string, number>;
   capacity: {
     units: number;
+    mailUnits: number;
+    packageUnits: number;
+    mailboxPackages: number;
     ageDays: number;
     level: string;
     expectedCampaigns: number;
@@ -83,6 +78,8 @@ type State = {
   sync: { checked: string; ok: number; detail: string } | null;
 };
 type View = "inbox" | "spam" | "archive";
+type SortOrder = "recency" | "importance";
+const sortPreferenceKey = "snail-mail.sort-order";
 const native = Capacitor.isNativePlatform();
 const apiOrigin = native ? import.meta.env.VITE_API_ORIGIN || "" : "";
 const asset = (name: string, thumb = false) =>
@@ -121,6 +118,22 @@ function App() {
     [toast, setToast] = useState("");
   const [form, setForm] = useState<Config | null>(null),
     [notes, setNotes] = useState("");
+  const [sortOrder, setSortOrder] = useState<SortOrder>(() => {
+    try {
+      return localStorage.getItem(sortPreferenceKey) === "recency"
+        ? "recency"
+        : "importance";
+    } catch {
+      return "importance";
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(sortPreferenceKey, sortOrder);
+    } catch {
+      // Sorting still works when browser storage is unavailable.
+    }
+  }, [sortOrder]);
   const notificationOpen = useRef<NotificationOpen | null>(null);
   const appActive = useRef(true);
   const scroll = useRef(0);
@@ -376,15 +389,21 @@ function App() {
     )
     .sort((a, b) => {
       const rank = { urgent: 0, important: 1, review: 2, normal: 3 };
-      return view === "archive"
-        ? b.date.localeCompare(a.date)
-        : rank[a.priority] - rank[b.priority] || b.date.localeCompare(a.date);
+      const recent = b.occurrences[0].date.localeCompare(a.occurrences[0].date);
+      const important = rank[a.priority] - rank[b.priority];
+      return (
+        (sortOrder === "recency" ? recent || important : important || recent) ||
+        a.groupId.localeCompare(b.groupId)
+      );
     });
   const focusIndex = filtered.findIndex(
     (x) => x.groupId === currentGroup?.groupId,
   );
   const shownEntries = filtered.reduce((n, x) => n + x.occurrences.length, 0);
-  const total = (data?.counts.inbox || 0) + (data?.counts.spam || 0);
+  const total =
+    (data?.counts.inbox || 0) +
+    (data?.counts.spam || 0) +
+    (data?.capacity.mailboxPackages || 0);
   const attention =
     data?.mailings.filter(
       (x) => !x.archived && ["important", "urgent"].includes(x.priority),
@@ -456,7 +475,15 @@ function App() {
             </div>
             <button
               className="primary pickup"
-              disabled={busy || !data || total === 0 || !!error}
+              disabled={
+                busy ||
+                !data ||
+                (total === 0 &&
+                  !data.packages.some(
+                    (p) => p.status === "delivered" && !p.archived,
+                  )) ||
+                !!error
+              }
               onClick={() => {
                 const id = crypto.randomUUID();
                 void action(async () => {
@@ -473,7 +500,7 @@ function App() {
               <Mailbox size={24} />
               <div>
                 <strong>
-                  {total === 0
+                  {data.capacity.units === 0
                     ? "A fresh start"
                     : data.capacity.level === "high"
                       ? "Your mailbox may be getting full"
@@ -482,7 +509,7 @@ function App() {
                         : "Room for a little more"}
                 </strong>
                 <span>
-                  {total === 0
+                  {data.capacity.units === 0
                     ? "New digests will collect here."
                     : `${data.capacity.ageDays} days accumulating · about ${data.capacity.units} letter equivalents · small mailbox`}
                 </span>
@@ -491,6 +518,14 @@ function App() {
                     Includes {data.capacity.expectedCampaigns} expected campaign
                     mailing{data.capacity.expectedCampaigns === 1 ? "" : "s"} ·
                     delivery unconfirmed
+                  </span>
+                )}
+                {!!data.capacity.mailboxPackages && (
+                  <span>
+                    Includes {data.capacity.mailboxPackages} package
+                    {data.capacity.mailboxPackages === 1 ? "" : "s"} delivered
+                    in/at the mailbox · {data.capacity.packageUnits} estimated
+                    letter equivalents
                   </span>
                 )}
               </div>
@@ -556,17 +591,32 @@ function App() {
                 ? "Likely advertising · you can correct any item"
                 : view === "archive"
                   ? "Collected mail, kept for reference"
-                  : "Needs attention first"}
+                  : sortOrder === "recency"
+                    ? "Newest digests first"
+                    : "Needs attention first"}
           </span>
-          <label className="search">
-            <Search size={15} />
-            <input
-              aria-label="Search mail"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Find a sender"
-            />
-          </label>
+          <div className="list-controls">
+            <label className="sort-control">
+              <span>Sort</span>
+              <select
+                aria-label="Sort mail"
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value as SortOrder)}
+              >
+                <option value="recency">Most recent</option>
+                <option value="importance">Most important</option>
+              </select>
+            </label>
+            <label className="search">
+              <Search size={15} />
+              <input
+                aria-label="Search mail"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Find a sender"
+              />
+            </label>
+          </div>
         </div>
         <div className={`workspace ${current ? "has-detail" : ""}`}>
           <div className="gallery" aria-label="Mail thumbnails">
@@ -879,39 +929,22 @@ function App() {
             view === "archive" ? p.archived : !p.archived,
           ).length && (
             <section className="packages">
-              <div>
+              <div className="packages-heading">
                 <Package size={20} />
                 <h3>Package updates</h3>
               </div>
-              {data.packages
-                .filter((p) => (view === "archive" ? p.archived : !p.archived))
-                .map((p) => (
-                  <div className="package-row" key={p.tracking}>
-                    <div>
-                      <strong>{p.sender || "USPS package"}</strong>
-                      <p>
-                        {p.details || "Awaiting a delivery update"}
-                        {p.expectedDate
-                          ? ` · expected ${fmt(p.expectedDate)}`
-                          : ""}
-                      </p>
-                      <p className="caption">
-                        As of the {fmt(p.sourceDate)} digest
-                      </p>
-                      <span>{p.tracking}</span>
-                    </div>
-                    <a
-                      href={`https://tools.usps.com/go/TrackConfirmAction?tLabels=${p.tracking}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Track <ArrowUpRight size={15} />
-                    </a>
-                  </div>
-                ))}
+              <div className="package-grid">
+                {data.packages
+                  .filter((p) =>
+                    view === "archive" ? p.archived : !p.archived,
+                  )
+                  .map((p) => (
+                    <PackageCard key={p.tracking} item={p} today={data.today} />
+                  ))}
+              </div>
               <p className="caption">
-                Expected packages aren’t counted toward mailbox fullness. A
-                package update doesn’t prove it is inside the mailbox.
+                Each package confirmed delivered in/at the mailbox adds 5 letter
+                equivalents until pickup. Package dimensions are unknown.
               </p>
             </section>
           )}
@@ -972,6 +1005,11 @@ function App() {
               Spam. Bulky pieces count as more than one letter. Repeated USPS
               saturation campaign previews count as one expected mailing, with
               delivery unconfirmed.
+            </p>
+            <p>
+              Packages confirmed delivered in/at the mailbox add 5 letter
+              equivalents each until pickup. This is a conservative allowance;
+              USPS tracking does not provide dimensions.
             </p>
             {form && (
               <form

@@ -116,6 +116,7 @@ test("HTTP integration: access boundaries, validated imports, pickup, undo and r
     403,
   );
   assert.equal((await post("/api/ingest/import", {})).status, 401);
+  assert.equal((await post("/api/ingest/tracking", {})).status, 401);
   const auth = {
     Authorization: `Bearer ${readFileSync(join(dir, "ingestion.key"), "utf8").trim()}`,
   };
@@ -137,7 +138,16 @@ test("HTTP integration: access boundaries, validated imports, pickup, undo and r
         imageKind: "unavailable",
       },
     ],
-    packages: [],
+    packages: [
+      {
+        tracking: "0000000000000000000001",
+        sender: "Test package",
+        status: "expected",
+        expectedDate: null,
+        deliveredDate: null,
+        details: "USPS is awaiting the item",
+      },
+    ],
   };
   assert.equal(
     (await post("/api/ingest/import", { ...m, advertisedCount: 2 }, auth))
@@ -151,6 +161,25 @@ test("HTTP integration: access boundaries, validated imports, pickup, undo and r
   );
   const state = await (await fetch(base + "/api/state")).json();
   assert.equal(state.items.length, 1);
+  const tracking = {
+    tracking: "0000000000000000000001",
+    status: "in_transit",
+    sourceUrl: "https://tools.usps.com/tracking/0000000000000000000001",
+    checkedAt: new Date().toISOString(),
+    expectedDate: null,
+    deliveredDate: null,
+    details: "Arrived at USPS Facility",
+    evidence: "The item is in transit.",
+  };
+  assert.equal(
+    (await post("/api/ingest/tracking", tracking, auth)).status,
+    200,
+  );
+  assert.deepEqual(
+    (await (await fetch(base + "/api/state")).json()).packages[0]
+      .trackingUpdate,
+    tracking,
+  );
   await fetch(base + "/api/items/aaaaaaaaaaaa%3A1", {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
@@ -191,6 +220,11 @@ test("HTTP integration: access boundaries, validated imports, pickup, undo and r
   child.stdin.write("snail-mail:shutdown\n");
   assert.equal((await stopped)[0], 0);
   await start();
+  assert.deepEqual(
+    (await (await fetch(base + "/api/state")).json()).packages[0]
+      .trackingUpdate,
+    tracking,
+  );
   assert.equal(
     (await (await fetch(base + "/api/state")).json()).counts.inbox,
     1,
